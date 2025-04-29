@@ -19,6 +19,7 @@ library(tidytext)
 library(textdata) 
 library(ggwordcloud)
 library(lubridate)
+library(tibble)
 
 
 
@@ -31,11 +32,10 @@ library(lubridate)
 
 ```
 
-**Note:** for more text analysis, you can fork & work through Casey O’Hara and Jessica Couture’s eco-data-sci workshop (available here https://github.com/oharac/text_workshop)
 
-### Get the IPCC report:
+### Get the lettet:
 ```{r get-document}
-letter1_path <- here("data","brev.Mette1573.pdf")
+letter1_path <- here("data1","data:brev_Rosenkrantz-02.pdf")
 library(tidytext)
 letter1_text <- pdf_text(letter1_path)
 letter1_text
@@ -78,7 +78,7 @@ letter1_tokens <- letter1_df %>%
   unnest_tokens(word, text_full)
 letter1_tokens
 
-# See how this differs from `ipcc_df`
+
 # Each word has its own row!
 ```
 
@@ -116,7 +116,6 @@ print(letter1_stop)
 ```
 
 
-
 We will *remove* stop words using `tidyr::anti_join()`:
 
 
@@ -142,7 +141,7 @@ letter1_no_numeric <- letter1_stop %>%
 letter1_no_numeric
 ```
 
-### A word cloud of IPCC report words (non-numeric)
+### A word cloud of the letter words (non-numeric)
 
 See more: https://cran.r-project.org/web/packages/ggwordcloud/vignettes/ggwordcloud.html
 
@@ -160,7 +159,7 @@ letter1_top150
 ```
 
 ```{r wordcloud}
-letter1_cloud <- ggplot(data = letter1_top100, aes(label = word)) +
+letter1_cloud <- ggplot(data = letter1_top150, aes(label = word)) +
   geom_text_wordcloud() +
   theme_minimal()
 
@@ -169,14 +168,91 @@ letter1_cloud
 
 That's underwhelming. Let's customize it a bit:
 ```{r wordcloud-pro}
-ggplot(data = letter1_top100, aes(label = word, size = n)) +
+ggplot(data = letter1_top150, aes(label = word, size = n)) +
   geom_text_wordcloud_area(aes(color = n), shape = "diamond") +
   scale_size_area(max_size = 8) +
   scale_color_gradientn(colors = c("darkgreen","blue","red")) +
   theme_minimal()
 ```
+```{r}
+#Indsat ved vejledning fra chatgpt til at kunne forbinde de indsatte filer til at kunne anvende funktionen "analyze()"
+library(pdftools)
+
+analyze <- function(file_path) {
+  text <- pdf_text(file_path)
+  if (length(text) >= 2) {
+    cat(text[2])
+  } else {
+    cat("PDF has fewer than 2 pages.\n") #ønsker kun 2. side i hver dokument
+  }
+}
+```
 
 
 
+```{r}
+#Følger guiden fra software carpentry 
+list.files(path = "data1", pattern = "pdf")
+```
+```{r}
+#Følger guiden fra software carpentry 
+list.files(path = "data1", pattern = "brev_Rosenkrantz", full.names = TRUE)
+```
+```{r}
+#Følger guiden fra software carpentry 
+filenames <- list.files(path = "data1",  
+                        pattern = "brev_Rosenkrantz-[0-9]{2}.pdf",
+                        full.names = TRUE)
+for (f in filenames) {
+  print(f)
+  analyze(f)
+}
+```
 
+
+```{r}
+#Kombinere det med tidytext
+analyze <- function(file_path) {
+  text <- pdf_text(file_path)
+  
+  if (length(text) < 2) {
+    return(tibble(file = basename(file_path), word = NA))
+  }
+  
+  second_page <- text[2]
+  #ønsker kun 2. side på hver dokument
+  
+  tibble(file = basename(file_path), text = second_page) %>%
+    unnest_tokens(word, text)
+}
+```
+
+
+```{r}
+filenames <- list.files(path = "data1",  
+                        pattern = "brev_Rosenkrantz-[0-9]{2}.pdf",
+                        full.names = TRUE)
+
+# Use lapply to process all files and bind results
+all_words <- lapply(filenames, analyze) %>%
+  bind_rows()
+```
+
+```{r}
+all_words
+#indeholder kun for de tre første pdf - måske får mange ord? brug for troubleshooting
+```
+```{r}
+#Tjek op på at alle 9 filer er tilstede 
+print(length(filenames)) 
+print(basename(filenames))
+```
+
+```{r}
+#Fjerner stopord 
+data(stoplist.txt)
+all_words_clean <- all_words %>%
+  anti_join(stop_words, by = "word")
+all_words_clean 
+```
 
