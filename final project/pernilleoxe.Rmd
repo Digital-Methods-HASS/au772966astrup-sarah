@@ -1,0 +1,122 @@
+---
+title: "pernilleoxe"
+output: html_document
+date: "2025-05-05"
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+
+
+# For text mining:
+library(pdftools)
+library(tidytext)
+library(textdata) 
+library(ggwordcloud)
+library(lubridate)
+library(tibble)
+
+```
+
+
+## R Markdown
+
+```{r}
+#Indsat ved vejledning fra chatgpt til at kunne forbinde de indsatte filer til at kunne anvende funktionen "analyze()"
+library(pdftools)
+
+analyze <- function(file_path) {
+  text <- pdf_text(file_path)
+  if (length(text) >= 2) {
+    cat(text[2])
+  } else {
+    cat("PDF has fewer than 2 pages.\n") #ønsker kun 2. side i hver dokument
+  }
+}
+```
+
+```{r}
+#Følger guiden fra software carpentry 
+list.files(path = "breve_oxe", pattern = "pdf")
+```
+
+```{r}
+#Følger guiden fra software carpentry 
+list.files(path = "breve_oxe", pattern = "breve_Oxe, Pernille", full.names = TRUE)
+```
+```{r}
+#Følger guiden fra software carpentry 
+filenames <- list.files(path = "breve_oxe",  
+                        pattern = "breve_Oxe, Pernille-[0-8]{2}.pdf",
+                        full.names = TRUE)
+for (f in filenames) {
+  print(f)
+  analyze(f)
+}
+```
+
+```{r}
+#Kombinere det med tidytext
+analyze <- function(file_path) {
+  text <- pdf_text(file_path)
+  
+  if (length(text) < 2) {
+    return(tibble(file = basename(file_path), word = NA))
+  }
+
+  second_page <- text[2]
+  #ønsker kun 2. side på hver dokument
+  
+  tibble(file = basename(file_path), text = second_page) %>%
+    unnest_tokens(word, text)
+}
+```
+
+```{r}
+filenames <- list.files(path = "breve_oxe",  
+                        pattern = "breve_Oxe, Pernille-[0-8]{2}.pdf",
+                        full.names = TRUE)
+
+# Use lapply to process all files and bind results
+all_wordsoxe <- lapply(filenames, analyze) %>%
+  bind_rows()
+all_wordsoxe
+```
+
+
+```{r}
+# Alle ord uden tal dvs. ikke anvendt stoplist
+all_wordsoxe_no_numeric <- all_wordsoxe%>% 
+  filter(is.na(as.numeric(word)))
+all_wordsoxe_no_numeric
+```
+```{r}
+#download data til at cluster med OpenRefine 
+write.csv(all_wordsoxe_no_numeric, "all_wordsoxe_no_numeric.csv", row.names = FALSE)
+```
+
+```{r}
+oxeclustered<-read.csv2("Clustered/all-wordsoxe-clustered.csv", na="NULL")
+oxeclustered
+```
+
+```{r}
+#Fjerner stopord 
+my_stops <- readLines("stoplist.txt")
+my_stops_df <- tibble(word = my_stops)
+
+all_words_clustered <- oxeclustered%>%
+  filter(!is.na(word)) %>%
+  anti_join(my_stops_df, by = "word")
+all_words_clustered
+```
+```{r}
+# Calculate the most frequent words
+most_used_words <- all_words_clustered %>%
+  count(word, sort = TRUE)  # 'sort = TRUE' arranges words by frequency in descending order
+
+# View the top 10 most frequent words
+head(most_used_words, 600)
+```
+
