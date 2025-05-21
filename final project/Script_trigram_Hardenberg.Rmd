@@ -1,0 +1,164 @@
+---
+title: "Letters from aristocratic women: Trigram, Anne Hardenberg"
+author: "Laura B. Jørgensen, Amanda Mondrup, Sarah Astrup, Cecilie Hvenegaard"
+date: "2025-05-12"
+output: html_document
+---
+
+
+```{r, message=FALSE}
+
+library(tidyverse)
+library(tidytext)
+library(here)
+library(pdftools)
+library(lubridate)
+
+
+```
+
+Load documents
+
+```{r}
+
+#Code made with guidance from chatgpt to combine the loaded files so that we can use the function "analyze()"
+
+analyze <- function(file_path) {
+  text <- pdf_text(file_path)
+  if (length(text) >= 2) {
+    cat(text[2])
+  } else {
+    cat("PDF has fewer than 2 pages.\n") #ønsker kun 2. side i hver dokument
+  }
+}
+```
+
+
+
+```{r}
+#Following the guide from software carpentry 
+list.files(path = "breve_hardenberg", pattern = "pdf")
+```
+```{r, include=FALSE}
+#Following the guide from software carpentry 
+list.files(path = "breve_hardenberg", pattern = "breve_Hardenberg,Anna-", full.names = TRUE)
+```
+```{r, indsætter dokument}
+#Following the guide from software carpentry 
+filenames <- list.files(path = "breve_hardenberg",  
+                        pattern = "breve_Hardenberg,Anna-.*\\.pdf${2}",
+                        full.names = TRUE)
+for (f in filenames) {
+  print(f)
+  analyze(f)
+}
+
+```
+Making every charachter to a tibble
+
+```{r}
+#combining it with tidytext
+analyze <- function(file_path) {
+  text <- pdf_text(file_path)
+  
+  if (length(text) < 2) {
+    return(tibble(file = basename(file_path), word = NA))
+  }
+
+  second_page <- text[2]
+  #we only want page 2 on each document
+  
+    
+  tibble(file = basename(file_path), text = second_page)
+}
+  
+
+```
+  
+```{r}
+
+filenames <- list.files(
+  path = "breve_hardenberg",  
+  pattern = "breve_Hardenberg,Anna-.*\\.pdf${2}",
+  full.names = TRUE
+)
+
+# Use lapply to process all files and bind results
+all_texts <- lapply(filenames, analyze) %>%
+  bind_rows()
+
+```
+
+Sorting in trigram. The following codes (all codes until the end) is made by Max Odsbjerg Pedersen, but with a lot of modifications, so it worked for our purposes.
+```{r}
+all_texts %>% 
+  unnest_tokens(bigram, text , token = "ngrams", n=3) -> breve_trigrams
+
+
+breve_trigrams
+
+```
+
+Counting trigram
+```{r}
+
+breve_trigrams %>% 
+  select(bigram)
+
+
+breve_trigrams%>% 
+  count(bigram, sort = TRUE)
+
+
+```
+
+separating the trigrams into three columns
+```{r}
+breve_trigrams %>% 
+  separate(bigram, c("word1", "word2", "word3"), sep = " ") ->breve_trigrams_separated
+```
+
+
+
+```{r, include=FALSE}
+
+stopord<- readLines("stoplist.txt")
+
+breve_trigrams_separated %>% 
+  filter(!word1 %in% stopord) %>%
+  filter(!word2 %in% stopord) %>% 
+  filter(!word3 %in% stopord)-> breve_trigrams_filtered
+
+
+```
+
+```{r, include=FALSE}
+breve_trigrams_filtered %>% 
+  count(word1, word2, word3, sort = TRUE)
+```
+
+Regular expression of the verb "befaler", to se which trigram the words is in
+```{r}
+
+breve_trigrams %>% 
+  filter(str_detect(bigram, "\\bbef+al+[a-zæø]*"))
+
+```
+
+
+Counting how many times the word occurs in a trigram and afterwards we look at different words at the same time.
+
+```{r}
+
+breve_trigrams_separated %>% 
+  filter(str_detect(word1, "\\bbef+al+[a-zæø]*")) %>% 
+  count(word1, word2, word3, sort = TRUE)
+
+
+
+breve_trigrams_separated %>% 
+  filter(str_detect(word3, "\\bbef+al+[a-zæø]*|\\bbest[a-zæø]*|\\bgud[a-zæø]*")) %>% 
+  count(word1, word2, word3, sort = TRUE)
+
+
+```
